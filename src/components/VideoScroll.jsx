@@ -94,7 +94,7 @@ const CinematicChapter = ({ chapter, index, isHero }) => {
   // --- COMMON ANIMATIONS ---
   const chapterOpacity = useTransform(scrollYProgress, [0, 0.1, 0.9, 1], [0, 1, 1, 0]);
   const textOpacity = useTransform(scrollYProgress, [0.1, 0.2, 0.8, 0.9], [0, 1, 1, 0]);
-  const textY = useTransform(scrollYProgress, [0.1, 0.2, 0.8, 0.9], [30, 0, 0, -30]);
+
   const labelOpacity = useTransform(scrollYProgress, [0.05, 0.15, 0.85, 0.95], [0, 1, 1, 0]);
   const labelLineScale = useTransform(scrollYProgress, [0.05, 0.15], [0, 1]);
   const bgParallax = useTransform(scrollYProgress, [0, 1], [-50, 50]);
