@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+    font-family: 'Montserrat';
+    font-style: normal;
+    font-weight: 300 800;
+    font-display: swap;
+    src: url(https://fonts.gstatic.com/s/montserrat/v25/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2) format('woff2');
+}
+
+:root {
+    --font-montserrat: "Montserrat", sans-serif;
+    --bs-font-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+    
+    --white-color: #fff;
+    --black-color: #000;
+    --black-color2: #1D1D1D;
+    --title-color: #16191E;
+    --text-color: #5E5E5E;
+    --primary-color1: #EFB93F;
+}
+
+@layer base {
+  * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      scroll-behavior: smooth;
+  }
+
+  body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-montserrat);
+      color: var(--text-color);
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.5;
+      background-color: var(--white-color);
+      -webkit-text-size-adjust: 100%;
+      -webkit-tap-highlight-color: transparent;
+  }
+}
