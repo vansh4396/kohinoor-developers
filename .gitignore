@@ -22,3 +22,7 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Source videos - frames are used by the website
+/brand assets/*.mp4
+/public/assets/*.mp4
