@@ -1,68 +1,262 @@
 class FrameLoader {
   constructor() {
-    this.cache = new Map(); // url -> HTMLImageElement
-    this.maxCacheSize = window.innerWidth < 768 ? 60 : 120; // smaller cache for mobile
-    this.loading = new Set(); // urls currently loading
+    this.cache = new Map();
+    this.loading = new Map();
+
+    this.queue = [];
+    this.queued = new Set();
+
+    this.activeLoads = 0;
+
+    // Controlled network concurrency.
+    this.maxConcurrent =
+      window.innerWidth < 768 ? 3 : 5;
+
+    // Keep memory usage bounded.
+    this.maxCacheSize =
+      window.innerWidth < 768 ? 35 : 60;
   }
 
-  // Preload a sequence of frames, prioritizing closest ones
-  preload(urls, currentIndex) {
-    // Sort urls by distance to currentIndex
-    const sortedUrls = [...urls].sort((a, b) => {
-      const distA = Math.abs(urls.indexOf(a) - currentIndex);
-      const distB = Math.abs(urls.indexOf(b) - currentIndex);
-      return distA - distB;
-    });
+  /**
+   * Load one frame.
+   */
+  loadImage(url, priority = 0) {
+    // Already decoded and cached.
+    if (this.cache.has(url)) {
+      return Promise.resolve(
+        this.cache.get(url)
+      );
+    }
 
-    // Only preload up to maxCacheSize frames ahead/behind
-    const urlsToLoad = sortedUrls.slice(0, this.maxCacheSize);
-    
-    // Evict far away frames
-    this.evict(urlsToLoad);
+    // Already downloading.
+    if (this.loading.has(url)) {
+      return this.loading.get(url);
+    }
 
-    urlsToLoad.forEach(url => {
-      if (!this.cache.has(url) && !this.loading.has(url)) {
-        this.loadImage(url);
+    // Create one shared promise for this URL.
+    const promise = new Promise(
+      (resolve, reject) => {
+        this.queue.push({
+          url,
+          priority,
+          resolve,
+          reject,
+        });
+
+        this.queued.add(url);
+
+        this.sortQueue();
+        this.processQueue();
       }
-    });
+    );
+
+    this.loading.set(url, promise);
+
+    return promise;
   }
 
-  loadImage(url) {
-    return new Promise((resolve, reject) => {
+  /**
+   * Highest priority first.
+   */
+  sortQueue() {
+    this.queue.sort(
+      (a, b) => a.priority - b.priority
+    );
+  }
+
+  /**
+   * Start queued downloads while concurrency
+   * limit allows.
+   */
+  processQueue() {
+    while (
+      this.activeLoads <
+      this.maxConcurrent &&
+      this.queue.length > 0
+    ) {
+      const item = this.queue.shift();
+
+      if (!item) {
+        break;
+      }
+
+      const {
+        url,
+        resolve,
+        reject,
+      } = item;
+
+      this.queued.delete(url);
+
+      /*
+       * It may have been loaded while waiting
+       * in the queue.
+       */
       if (this.cache.has(url)) {
-        resolve(this.cache.get(url));
-        return;
+        this.loading.delete(url);
+
+        resolve(
+          this.cache.get(url)
+        );
+
+        continue;
       }
 
-      this.loading.add(url);
+      this.activeLoads++;
+
       const img = new Image();
-      img.onload = () => {
-        this.cache.set(url, img);
-        this.loading.delete(url);
-        resolve(img);
-      };
-      img.onerror = (e) => {
-        this.loading.delete(url);
-        reject(e);
-      };
-      img.src = url;
-    });
-  }
 
-  // Clean up cache to prevent memory leaks, especially on mobile
-  evict(keepUrls) {
-    const keepSet = new Set(keepUrls);
-    for (const [url, img] of this.cache.entries()) {
-      if (!keepSet.has(url)) {
-        img.src = ''; // help GC
-        this.cache.delete(url);
-      }
+      /*
+       * Let the browser decode asynchronously.
+       */
+      img.decoding = 'async';
+
+      img.onload = () => {
+        this.activeLoads--;
+
+        this.loading.delete(url);
+
+        this.cache.set(url, img);
+
+        resolve(img);
+
+        this.evict();
+
+        this.processQueue();
+      };
+
+      img.onerror = (error) => {
+        this.activeLoads--;
+
+        this.loading.delete(url);
+
+        reject(error);
+
+        this.processQueue();
+      };
+
+      img.src = url;
     }
   }
 
+  /**
+   * Queue frames around the current position.
+   *
+   * The current frame always receives the highest
+   * priority.
+   */
+  preload(
+    urls,
+    currentIndex,
+    direction = 1
+  ) {
+    const total = urls.length;
+
+    /*
+     * 1. Current frame.
+     */
+    if (urls[currentIndex]) {
+      this.loadImage(
+        urls[currentIndex],
+        -10000
+      );
+    }
+
+    /*
+     * 2. Frames immediately ahead.
+     *
+     * Small enough to avoid flooding the browser,
+     * large enough to provide a useful buffer.
+     */
+    const forwardCount = 24;
+
+    for (
+      let distance = 1;
+      distance <= forwardCount;
+      distance++
+    ) {
+      const index =
+        currentIndex +
+        direction * distance;
+
+      if (
+        index < 0 ||
+        index >= total
+      ) {
+        continue;
+      }
+
+      this.loadImage(
+        urls[index],
+        distance
+      );
+    }
+
+    /*
+     * 3. Smaller buffer behind.
+     */
+    const backwardCount = 8;
+
+    for (
+      let distance = 1;
+      distance <= backwardCount;
+      distance++
+    ) {
+      const index =
+        currentIndex -
+        direction * distance;
+
+      if (
+        index < 0 ||
+        index >= total
+      ) {
+        continue;
+      }
+
+      this.loadImage(
+        urls[index],
+        100 + distance
+      );
+    }
+  }
+
+  /**
+   * Keep memory usage under control.
+   *
+   * Map insertion order acts as a simple FIFO cache.
+   */
+  evict() {
+    while (
+      this.cache.size >
+      this.maxCacheSize
+    ) {
+      const oldestKey =
+        this.cache.keys().next().value;
+
+      if (!oldestKey) {
+        break;
+      }
+
+      const img =
+        this.cache.get(oldestKey);
+
+      if (img) {
+        img.src = '';
+      }
+
+      this.cache.delete(oldestKey);
+    }
+  }
+
+  /**
+   * Get an already decoded frame.
+   */
   getFrame(url) {
-    return this.cache.get(url) || null;
+    return (
+      this.cache.get(url) || null
+    );
   }
 }
 
-export const frameLoader = new FrameLoader();
+export const frameLoader =
+  new FrameLoader();
