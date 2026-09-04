@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -43,11 +44,9 @@ const generateFrameUrls = () => {
   return urls;
 };
 
-const frameUrls =
-  generateFrameUrls();
+const frameUrls = generateFrameUrls();
 
-const TOTAL_FRAMES =
-  frameUrls.length;
+const TOTAL_FRAMES = frameUrls.length;
 
 
 /*
@@ -57,14 +56,11 @@ const TOTAL_FRAMES =
  */
 
 const CanvasSequence = () => {
-  const containerRef =
-    useRef(null);
+  const containerRef = useRef(null);
 
-  const canvasRef =
-    useRef(null);
+  const canvasRef = useRef(null);
 
-  const ctxRef =
-    useRef(null);
+  const ctxRef = useRef(null);
 
   const [
     isLoaded,
@@ -74,20 +70,15 @@ const CanvasSequence = () => {
   /*
    * Renderer refs.
    */
-  const lastRenderedIndex =
-    useRef(-1);
+  const lastRenderedIndex = useRef(-1);
 
-  const lastTargetIndex =
-    useRef(0);
+  const lastTargetIndex = useRef(0);
 
-  const directionRef =
-    useRef(1);
+  const directionRef = useRef(1);
 
-  const animationFrameRef =
-    useRef(null);
+  const animationFrameRef = useRef(null);
 
-  const resizeObserverRef =
-    useRef(null);
+  const resizeObserverRef = useRef(null);
 
   /*
    * Scroll progress.
@@ -109,14 +100,10 @@ const CanvasSequence = () => {
    * ============================================================
    */
 
-  const drawFrame = (
-    img
-  ) => {
-    const canvas =
-      canvasRef.current;
+  const drawFrame = (img) => {
+    const canvas = canvasRef.current;
 
-    const ctx =
-      ctxRef.current;
+    const ctx = ctxRef.current;
 
     if (
       !canvas ||
@@ -126,39 +113,34 @@ const CanvasSequence = () => {
       return;
     }
 
-    const canvasWidth =
-      canvas.width;
+    const canvasWidth = canvas.width;
 
-    const canvasHeight =
-      canvas.height;
+    const canvasHeight = canvas.height;
 
     const canvasRatio =
-      canvasWidth /
-      canvasHeight;
+      canvasWidth / canvasHeight;
 
     const imageRatio =
-      img.width /
-      img.height;
+      img.width / img.height;
 
     let drawWidth;
+
     let drawHeight;
 
     let offsetX = 0;
+
     let offsetY = 0;
 
     /*
      * Cover.
      */
     if (
-      canvasRatio >
-      imageRatio
+      canvasRatio > imageRatio
     ) {
-      drawWidth =
-        canvasWidth;
+      drawWidth = canvasWidth;
 
       drawHeight =
-        canvasWidth /
-        imageRatio;
+        canvasWidth / imageRatio;
 
       offsetY =
         (
@@ -166,12 +148,10 @@ const CanvasSequence = () => {
           drawHeight
         ) / 2;
     } else {
-      drawHeight =
-        canvasHeight;
+      drawHeight = canvasHeight;
 
       drawWidth =
-        canvasHeight *
-        imageRatio;
+        canvasHeight * imageRatio;
 
       offsetX =
         (
@@ -187,11 +167,9 @@ const CanvasSequence = () => {
       canvasHeight
     );
 
-    ctx.imageSmoothingEnabled =
-      true;
+    ctx.imageSmoothingEnabled = true;
 
-    ctx.imageSmoothingQuality =
-      'high';
+    ctx.imageSmoothingQuality = 'high';
 
     ctx.drawImage(
       img,
@@ -209,126 +187,125 @@ const CanvasSequence = () => {
    * ============================================================
    *
    * If the exact requested frame hasn't arrived yet,
-   * we render the nearest available frame instead of
+   * render the nearest available frame instead of
    * freezing the canvas.
    */
 
-  const renderBestAvailableFrame = (
-    targetIndex
-  ) => {
-    /*
-     * Exact frame.
-     */
-    const exact =
-      frameLoader.getFrame(
-        frameUrls[targetIndex]
-      );
-
-    if (exact) {
-      drawFrame(exact);
-
-      lastRenderedIndex.current =
-        targetIndex;
-
-      return;
-    }
-
-    /*
-     * Search in the direction of travel first.
-     */
-    const direction =
-      directionRef.current;
-
-    const searchDistances = [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      8,
-      10,
-      12,
-      15,
-      20,
-    ];
-
-    for (
-      const distance of
-      searchDistances
-    ) {
-      const candidateIndex =
-        targetIndex +
-        direction *
-        distance;
-
-      if (
-        candidateIndex < 0 ||
-        candidateIndex >=
-        TOTAL_FRAMES
-      ) {
-        continue;
-      }
-
-      const candidate =
+  const renderBestAvailableFrame = useCallback(
+    (targetIndex) => {
+      /*
+       * Exact frame.
+       */
+      const exact =
         frameLoader.getFrame(
-          frameUrls[
-          candidateIndex
-          ]
+          frameUrls[targetIndex]
         );
 
-      if (candidate) {
-        drawFrame(candidate);
+      if (exact) {
+        drawFrame(exact);
 
         lastRenderedIndex.current =
-          candidateIndex;
+          targetIndex;
 
         return;
       }
-    }
 
-    /*
-     * Search opposite direction as fallback.
-     */
-    for (
-      const distance of
-      searchDistances
-    ) {
-      const candidateIndex =
-        targetIndex -
-        direction *
-        distance;
+      /*
+       * Search in the direction of travel first.
+       */
+      const direction =
+        directionRef.current;
 
-      if (
-        candidateIndex < 0 ||
-        candidateIndex >=
-        TOTAL_FRAMES
+      const searchDistances = [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        10,
+        12,
+        15,
+        20,
+      ];
+
+      for (
+        const distance of
+        searchDistances
       ) {
-        continue;
+        const candidateIndex =
+          targetIndex +
+          direction * distance;
+
+        if (
+          candidateIndex < 0 ||
+          candidateIndex >=
+          TOTAL_FRAMES
+        ) {
+          continue;
+        }
+
+        const candidate =
+          frameLoader.getFrame(
+            frameUrls[
+            candidateIndex
+            ]
+          );
+
+        if (candidate) {
+          drawFrame(candidate);
+
+          lastRenderedIndex.current =
+            candidateIndex;
+
+          return;
+        }
       }
 
-      const candidate =
-        frameLoader.getFrame(
-          frameUrls[
-          candidateIndex
-          ]
-        );
+      /*
+       * Search opposite direction as fallback.
+       */
+      for (
+        const distance of
+        searchDistances
+      ) {
+        const candidateIndex =
+          targetIndex -
+          direction * distance;
 
-      if (candidate) {
-        drawFrame(candidate);
+        if (
+          candidateIndex < 0 ||
+          candidateIndex >=
+          TOTAL_FRAMES
+        ) {
+          continue;
+        }
 
-        lastRenderedIndex.current =
-          candidateIndex;
+        const candidate =
+          frameLoader.getFrame(
+            frameUrls[
+            candidateIndex
+            ]
+          );
 
-        return;
+        if (candidate) {
+          drawFrame(candidate);
+
+          lastRenderedIndex.current =
+            candidateIndex;
+
+          return;
+        }
       }
-    }
 
-    /*
-     * If absolutely nothing is available,
-     * keep the previous frame.
-     */
-  };
+      /*
+       * If absolutely nothing is available,
+       * keep the previous frame.
+       */
+    },
+    []
+  );
 
 
   /*
@@ -340,28 +317,27 @@ const CanvasSequence = () => {
   useEffect(() => {
     let cancelled = false;
 
-    const initialize =
-      async () => {
-        try {
-          await frameLoader.loadImage(
-            frameUrls[0],
-            -10000
-          );
+    const initialize = async () => {
+      try {
+        await frameLoader.loadImage(
+          frameUrls[0],
+          -10000
+        );
 
-          if (!cancelled) {
-            setIsLoaded(true);
-          }
-        } catch (error) {
-          console.error(
-            'Failed to load first frame:',
-            error
-          );
-
-          if (!cancelled) {
-            setIsLoaded(true);
-          }
+        if (!cancelled) {
+          setIsLoaded(true);
         }
-      };
+      } catch (error) {
+        console.error(
+          'Failed to load first frame:',
+          error
+        );
+
+        if (!cancelled) {
+          setIsLoaded(true);
+        }
+      }
+    };
 
     initialize();
 
@@ -406,72 +382,70 @@ const CanvasSequence = () => {
     /*
      * Resize canvas.
      */
-    const resizeCanvas =
-      () => {
-        const rect =
-          canvas.getBoundingClientRect();
+    const resizeCanvas = () => {
+      const rect =
+        canvas.getBoundingClientRect();
 
-        /*
-         * Cap DPR at 2.
-         *
-         * This prevents enormous canvas memory
-         * usage on high-DPI displays.
-         */
-        const dpr =
-          Math.min(
-            window.devicePixelRatio ||
-            1,
-            2
-          );
+      /*
+       * Cap DPR at 2.
+       *
+       * This prevents enormous canvas memory
+       * usage on high-DPI displays.
+       */
+      const dpr =
+        Math.min(
+          window.devicePixelRatio || 1,
+          2
+        );
 
-        canvas.width =
+      canvas.width =
+        Math.max(
+          1,
+          Math.floor(
+            rect.width * dpr
+          )
+        );
+
+      canvas.height =
+        Math.max(
+          1,
+          Math.floor(
+            rect.height * dpr
+          )
+        );
+
+      /*
+       * Redraw current frame after resize.
+       */
+      const progress =
+        scrollYProgress.get();
+
+      const index =
+        Math.min(
+          TOTAL_FRAMES - 1,
           Math.max(
-            1,
+            0,
             Math.floor(
-              rect.width * dpr
-            )
-          );
-
-        canvas.height =
-          Math.max(
-            1,
-            Math.floor(
-              rect.height * dpr
-            )
-          );
-
-        /*
-         * Redraw current frame after resize.
-         */
-        const progress =
-          scrollYProgress.get();
-
-        const index =
-          Math.min(
-            TOTAL_FRAMES - 1,
-            Math.max(
-              0,
-              Math.floor(
-                progress *
-                (
-                  TOTAL_FRAMES - 1
-                )
+              progress *
+              (
+                TOTAL_FRAMES - 1
               )
             )
-          );
+          )
+        );
 
-        const frame =
-          frameLoader.getFrame(
-            frameUrls[index]
-          );
+      const frame =
+        frameLoader.getFrame(
+          frameUrls[index]
+        );
 
-        if (frame) {
-          drawFrame(frame);
+      if (frame) {
+        drawFrame(frame);
 
-          lastRenderedIndex.current =
-            index;
-        }
-      };
+        lastRenderedIndex.current =
+          index;
+      }
+    };
 
 
     /*
@@ -505,76 +479,73 @@ const CanvasSequence = () => {
      * ========================================================
      */
 
-    const renderLoop =
-      () => {
-        const progress =
-          scrollYProgress.get();
+    const renderLoop = () => {
+      const progress =
+        scrollYProgress.get();
 
-        const targetIndex =
-          Math.min(
-            TOTAL_FRAMES - 1,
-            Math.max(
-              0,
-              Math.floor(
-                progress *
-                (
-                  TOTAL_FRAMES - 1
-                )
+      const targetIndex =
+        Math.min(
+          TOTAL_FRAMES - 1,
+          Math.max(
+            0,
+            Math.floor(
+              progress *
+              (
+                TOTAL_FRAMES - 1
               )
             )
-          );
-
-
-        /*
-         * Detect direction.
-         */
-        if (
-          targetIndex >
-          lastTargetIndex.current
-        ) {
-          directionRef.current =
-            1;
-        } else if (
-          targetIndex <
-          lastTargetIndex.current
-        ) {
-          directionRef.current =
-            -1;
-        }
-
-        lastTargetIndex.current =
-          targetIndex;
-
-
-        /*
-         * Tell loader what frame is currently
-         * needed and which direction we're moving.
-         */
-        frameLoader.preload(
-          frameUrls,
-          targetIndex,
-          directionRef.current
+          )
         );
 
 
-        /*
-         * Only attempt a new draw when target changes.
-         */
-        if (
-          targetIndex !==
-          lastRenderedIndex.current
-        ) {
-          renderBestAvailableFrame(
-            targetIndex
-          );
-        }
+      /*
+       * Detect direction.
+       */
+      if (
+        targetIndex >
+        lastTargetIndex.current
+      ) {
+        directionRef.current = 1;
+      } else if (
+        targetIndex <
+        lastTargetIndex.current
+      ) {
+        directionRef.current = -1;
+      }
+
+      lastTargetIndex.current =
+        targetIndex;
 
 
-        animationFrameRef.current =
-          requestAnimationFrame(
-            renderLoop
-          );
-      };
+      /*
+       * Tell loader what frame is currently
+       * needed and which direction we're moving.
+       */
+      frameLoader.preload(
+        frameUrls,
+        targetIndex,
+        directionRef.current
+      );
+
+
+      /*
+       * Only attempt a new draw when target changes.
+       */
+      if (
+        targetIndex !==
+        lastRenderedIndex.current
+      ) {
+        renderBestAvailableFrame(
+          targetIndex
+        );
+      }
+
+
+      animationFrameRef.current =
+        requestAnimationFrame(
+          renderLoop
+        );
+    };
 
 
     animationFrameRef.current =
@@ -614,6 +585,7 @@ const CanvasSequence = () => {
   }, [
     isLoaded,
     scrollYProgress,
+    renderBestAvailableFrame,
   ]);
 
 
@@ -711,8 +683,7 @@ const CanvasSequence = () => {
 
           <motion.div
             style={{
-              opacity:
-                seq1Opacity,
+              opacity: seq1Opacity,
             }}
             className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 md:px-16"
           >
@@ -730,8 +701,7 @@ const CanvasSequence = () => {
 
           <motion.div
             style={{
-              opacity:
-                seq2Opacity,
+              opacity: seq2Opacity,
             }}
             className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 md:px-16"
           >
@@ -749,8 +719,7 @@ const CanvasSequence = () => {
 
           <motion.div
             style={{
-              opacity:
-                seq3Opacity,
+              opacity: seq3Opacity,
             }}
             className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 md:px-16"
           >
@@ -768,8 +737,7 @@ const CanvasSequence = () => {
 
           <motion.div
             style={{
-              opacity:
-                seq4Opacity,
+              opacity: seq4Opacity,
             }}
             className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 md:px-16"
           >
